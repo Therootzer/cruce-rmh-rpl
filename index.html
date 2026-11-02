@@ -1,0 +1,874 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light}[hidden]{display:none!important}body{margin:0}img{max-width:100%}</style>
+<title>Cruce RMH vs RPL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: una sola columna de trabajo. Carga de archivos arriba, filtros, pestañas con lectura de resumen → detalle. */
+:root {
+  --bg: #f3f5f6; --surface: #ffffff; --surface-2: #eaeef0; --ink: #172026; --ink-2: #4f5d66; --ink-3: #7a8790;
+  --line: #d9e0e4; --accent: #1c6b58; --accent-ink: #ffffff; --accent-soft: #dcefe9;
+  --over: #a8620a; --over-soft: #f8ead3; --under: #1f5fa8; --under-soft: #dde9f7;
+  --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11171a; --surface: #192126; --surface-2: #232d33; --ink: #e8eef1; --ink-2: #a9b6be; --ink-3: #7f8d96;
+    --line: #2d3a41; --accent: #52c4a6; --accent-ink: #0c1a16; --accent-soft: #1b3a33;
+    --over: #e6ae5c; --over-soft: #3a2d17; --under: #74aef0; --under-soft: #1b2c42; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11171a; --surface: #192126; --surface-2: #232d33; --ink: #e8eef1; --ink-2: #a9b6be; --ink-3: #7f8d96;
+  --line: #2d3a41; --accent: #52c4a6; --accent-ink: #0c1a16; --accent-soft: #1b3a33;
+  --over: #e6ae5c; --over-soft: #3a2d17; --under: #74aef0; --under-soft: #1b2c42; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.45;
+  padding-block: 20px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 13px; font-weight: 600; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
+.sub { color: var(--ink-2); margin: 4px 0 0; max-width: 78ch; }
+.num, td.n, th.n { font-variant-numeric: tabular-nums; }
+button, input, select { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible, .drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+
+/* carga */
+.loads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.drop { position: relative; display: flex; flex-direction: column; gap: 6px; border: 1.5px dashed var(--line); border-radius: 8px; background: var(--surface); padding: 14px 16px; cursor: pointer; min-width: 0; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop.ok { border-style: solid; }
+.drop input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.drop .tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--ink-3); text-transform: uppercase; }
+.drop .ttl { font-weight: 600; }
+.drop .st { color: var(--ink-2); font-size: 13px; overflow-wrap: anywhere; }
+.drop .st b { color: var(--ink); font-weight: 500; }
+.drop select { position: relative; z-index: 2; align-self: flex-start; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.prog { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.prog > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+.err { color: var(--over); font-size: 13px; }
+.demo { background: var(--over-soft); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+
+/* filtros */
+.filters { display: flex; flex-direction: column; gap: 10px; }
+.frow { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.fgrp { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.flabel { font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-right: 2px; }
+.chip { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; cursor: pointer; font-size: 13px; }
+.chip[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { background: var(--surface); border: 0; border-right: 1px solid var(--line); padding: 4px 10px; cursor: pointer; font-size: 13px; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed=true] { background: var(--accent); color: var(--accent-ink); }
+.in { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; min-width: 0; }
+input.in[type=search] { width: 210px; }
+input.in[type=number] { width: 64px; }
+label.ck { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.drill { display: inline-flex; gap: 6px; align-items: center; background: var(--accent-soft); border-radius: 999px; padding: 2px 4px 2px 10px; font-size: 13px; }
+.drill button { border: 0; background: transparent; cursor: pointer; font-size: 15px; line-height: 1; padding: 0 6px; color: var(--ink-2); }
+
+/* pestañas */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs button { background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; cursor: pointer; color: var(--ink-2); font-weight: 500; }
+.tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--accent); }
+
+/* resumen */
+.read p { margin: 0 0 6px; max-width: 90ch; }
+.read p:last-child { margin: 0; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+.kpi .l { font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.kpi .v { font-family: var(--mono); font-size: 26px; font-weight: 500; margin: 2px 0; font-variant-numeric: tabular-nums; }
+.kpi .d { font-size: 12.5px; color: var(--ink-2); }
+.over { color: var(--over); } .under { color: var(--under); }
+.two { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.sbars { display: flex; flex-direction: column; }
+.srow { display: grid; grid-template-columns: minmax(90px, 160px) minmax(0, 1fr) 64px; gap: 8px; align-items: center; padding: 3px 0; background: transparent; border: 0; width: 100%; text-align: left; cursor: pointer; border-radius: 4px; }
+.srow:hover { background: var(--surface-2); }
+.srow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.srow .tr { position: relative; height: 14px; }
+.srow .tr::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.srow .tr i { position: absolute; top: 2px; bottom: 2px; border-radius: 2px; }
+.srow .tr i.o { left: 50%; background: var(--over); border-radius: 0 3px 3px 0; }
+.srow .tr i.u { right: 50%; background: var(--under); border-radius: 3px 0 0 3px; }
+.srow .vl { text-align: right; font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.mclist { display: flex; flex-direction: column; }
+.mcrow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: baseline; padding: 6px 4px; border: 0; border-top: 1px solid var(--line); background: transparent; text-align: left; cursor: pointer; width: 100%; }
+.mcrow:first-child { border-top: 0; }
+.mcrow:hover { background: var(--surface-2); }
+.mcrow .c { font-family: var(--mono); font-size: 12.5px; }
+.mcrow .ds { color: var(--ink-3); font-size: 12px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mcrow .v { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+/* tablas */
+.tw { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { text-align: left; font-weight: 500; font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; padding: 6px 8px; border-bottom: 1px solid var(--line); background: var(--surface); position: sticky; top: 0; }
+th button { background: transparent; border: 0; padding: 0; cursor: pointer; font: inherit; text-transform: inherit; letter-spacing: inherit; color: inherit; }
+th[aria-sort] button { color: var(--ink); }
+td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+td.n, th.n { text-align: right; }
+td.n { font-family: var(--mono); font-size: 12.5px; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--surface-2); }
+td .id { color: var(--ink-3); font-family: var(--mono); font-size: 11.5px; margin-left: 6px; }
+td .ds { color: var(--ink-3); font-size: 12px; display: block; }
+.dc { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.dc .bar { width: 70px; height: 8px; position: relative; flex: none; }
+.dc .bar::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.dc .bar i { position: absolute; top: 0; bottom: 0; }
+.dc .bar i.o { left: 50%; background: var(--over); } .dc .bar i.u { right: 50%; background: var(--under); }
+.dc .t { min-width: 46px; text-align: right; }
+.pill { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 12px; white-space: nowrap; border: 1px solid var(--line); color: var(--ink-2); }
+.pill.a { background: var(--under-soft); color: var(--under); border-color: transparent; }
+.pill.b { background: var(--over-soft); color: var(--over); border-color: transparent; }
+.pill.d { color: var(--ink); }
+tr.sub td { background: var(--surface-2); padding: 8px 16px; }
+.sizes { display: flex; flex-wrap: wrap; gap: 6px; }
+.sz { display: grid; grid-template-columns: auto auto; gap: 0 8px; align-items: baseline; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; font-family: var(--mono); font-size: 12px; }
+.sz b { grid-column: 1 / -1; font-weight: 500; }
+.sz.diff { border-color: var(--ink-3); }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.btn { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 11px; cursor: pointer; }
+.btn:hover { background: var(--surface-2); }
+.muted { color: var(--ink-3); }
+.empty { padding: 28px 8px; text-align: center; color: var(--ink-2); }
+.note { color: var(--ink-2); font-size: 13px; margin: 0 0 8px; max-width: 90ch; }
+@media (max-width: 820px) {
+  .loads, .two { grid-template-columns: minmax(0, 1fr); }
+  input.in[type=search] { width: 100%; }
+  .srow { grid-template-columns: minmax(80px, 120px) minmax(0, 1fr) 56px; }
+}
+@media (prefers-reduced-motion: reduce) { .prog > i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Cruce RMH vs RPL</h1>
+    <p class="sub">Carga el Stock Diario (RMH) y el RPL del mismo día. La página compara el stock en tienda por tienda, modelo-color y talla, y muestra dónde no coinciden. Los archivos se leen en tu navegador y no se envían a ningún lado.</p>
+  </header>
+
+  <section class="loads" aria-label="Carga de archivos">
+    <div class="drop" id="drop-rmh">
+      <input type="file" id="file-rmh" accept=".xlsx,.xlsm,.csv" aria-label="Cargar RMH (Stock Diario)">
+      <span class="tag">RMH · Stock Diario</span>
+      <span class="ttl">Arrastra el .xlsx o haz clic</span>
+      <span class="st" id="st-rmh">Se usa la hoja Stock. Si prefieres otra hoja (por ejemplo Consulta), la eliges después de cargar. También sirve un .csv de una hoja con esas columnas.</span>
+      <div class="prog" id="pg-rmh" hidden><i></i></div>
+    </div>
+    <div class="drop" id="drop-rpl">
+      <input type="file" id="file-rpl" accept=".csv" aria-label="Cargar RPL">
+      <span class="tag">RPL · Rpl_KSD</span>
+      <span class="ttl">Arrastra el .csv o haz clic</span>
+      <span class="st" id="st-rpl">Archivo Rpl_KSD_… separado por punto y coma.</span>
+      <div class="prog" id="pg-rpl" hidden><i></i></div>
+    </div>
+  </section>
+  <div class="demo" id="demo" hidden></div>
+
+  <section class="card filters" aria-label="Filtros">
+    <div class="frow">
+      <div class="fgrp" id="g-rm"><span class="flabel">RMH usa</span>
+        <span class="seg" id="seg-rm"><button type="button" data-v="total" aria-pressed="true" title="stock + fl">Total</button><button type="button" data-v="stock" aria-pressed="false">Solo stock</button></span></div>
+      <div class="fgrp"><span class="flabel">RPL usa</span>
+        <span class="seg" id="seg-pm"><button type="button" data-v="tda" aria-pressed="true" title="STK_TDA">En tienda</button><button type="button" data-v="tot" aria-pressed="false" title="STK_TOT">Tienda + tránsito</button></span></div>
+    </div>
+    <div class="frow">
+      <div class="fgrp" id="g-brand"><span class="flabel">Marca</span></div>
+      <div class="fgrp" id="g-line"><span class="flabel">Línea</span></div>
+    </div>
+    <div class="frow">
+      <div class="fgrp"><span class="flabel">Tienda</span><select class="in" id="sel-store" aria-label="Tienda"></select></div>
+      <div class="fgrp"><input class="in" type="search" id="q" placeholder="Buscar modelo, color o tienda" aria-label="Buscar"></div>
+      <label class="ck"><input type="checkbox" id="ck-diff" checked> Solo con diferencia</label>
+      <div class="fgrp"><span class="flabel">Desvío mín.</span><input class="in" type="number" id="min" min="0" value="1" aria-label="Desvío mínimo en pares"></div>
+      <label class="ck" title="Tiendas que están en un solo archivo. Por defecto quedan fuera para no inflar la diferencia."><input type="checkbox" id="ck-incl"> Incluir tiendas sin cruce</label>
+      <span id="drills"></span>
+    </div>
+  </section>
+
+  <div class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-tab="res" aria-selected="true">Resumen</button>
+    <button role="tab" data-tab="tda" aria-selected="false">Por tienda</button>
+    <button role="tab" data-tab="mc" aria-selected="false">Por modelo-color</button>
+    <button role="tab" data-tab="sm" aria-selected="false">Tienda × modelo-color</button>
+    <button role="tab" data-tab="cob" aria-selected="false">Cobertura</button>
+  </div>
+  <main id="panel"></main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+<script>
+/* Lectores de archivos: RPL (csv) y RMH (hoja Stock de Stock Diario, xlsx o csv). Sin dependencias salvo fflate. */
+const Parse = (() => {
+  const nz = (x) => (x == null ? '' : String(x).trim());
+  const num = (x) => { if (x == null || x === '') return 0; const n = Number(x); return Number.isFinite(n) ? n : 0; };
+  const normId = (x) => { const t = nz(x); return /^-?\d+(\.0+)?$/.test(t) ? String(parseInt(t, 10)) : t; };
+  const entity = (s) => s.indexOf('&') < 0 ? s : s.replace(/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);/g, (m, g) => {
+    if (g === 'amp') return '&'; if (g === 'lt') return '<'; if (g === 'gt') return '>';
+    if (g === 'quot') return '"'; if (g === 'apos') return "'";
+    return String.fromCodePoint(g[1] === 'x' ? parseInt(g.slice(2), 16) : parseInt(g.slice(1), 10));
+  });
+  const colIdx = (c) => { let n = 0; for (let i = 0; i < c.length; i++) n = n * 26 + c.charCodeAt(i) - 64; return n - 1; };
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  /* ---------- CSV ---------- */
+  function splitLine(line, d) {
+    if (line.indexOf('"') < 0) return line.split(d);
+    const out = []; let cur = ''; let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (q) { if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === d) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur); return out;
+  }
+  function decodeText(buf) {
+    let t = new TextDecoder('utf-8').decode(buf);
+    if (t.indexOf(String.fromCharCode(65533)) >= 0) t = new TextDecoder('windows-1252').decode(buf);
+    return t.charCodeAt(0) === 0xFEFF ? t.slice(1) : t;
+  }
+  async function csvTable(file, onProgress) {
+    const text = decodeText(new Uint8Array(await file.arrayBuffer()));
+    const lines = text.split(/\r?\n/);
+    const first = lines[0] || '';
+    const d = (first.split(';').length >= first.split(',').length) ? ';' : ',';
+    const headers = splitLine(first, d).map((h) => nz(h));
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i]) continue;
+      rows.push(splitLine(lines[i], d));
+      if (i % 40000 === 0) { onProgress && onProgress(i / lines.length); await tick(); }
+    }
+    return { headers, rows };
+  }
+
+  function stampFromName(name) {
+    const m = /_(\d{2})-(\d{2})-(\d{2})_(\d{2})_(\d{2})_(\d{2})/.exec(name || '');
+    return m ? `${m[1]}/${m[2]}/20${m[3]} ${m[4]}:${m[5]}:${m[6]}` : '';
+  }
+
+  /* ---------- RPL ---------- */
+  async function readRpl(file, onProgress) {
+    const { headers, rows } = await csvTable(file, onProgress);
+    const H = {}; headers.forEach((h, i) => { H[h.toUpperCase()] = i; });
+    for (const need of ['IDSTORE', 'ITEMCODE', 'STK_TDA']) {
+      if (!(need in H)) throw new Error(`Este archivo no parece un RPL: falta la columna ${need}.`);
+    }
+    const g = (r, k) => (k in H ? r[H[k]] : '');
+    const seen = new Set(); const out = [];
+    for (const r of rows) {
+      const s = normId(g(r, 'IDSTORE')); const k = nz(g(r, 'ITEMCODE')).toUpperCase();
+      if (!s || !k) continue;
+      const key = s + '|' + k;
+      if (seen.has(key)) continue; // el RPL no repite tienda-SKU; si pasara, no se suma dos veces
+      seen.add(key);
+      const tda = num(g(r, 'STK_TDA')); const tra = num(g(r, 'STK_TRA'));
+      out.push({
+        s, sn: nz(g(r, 'STORENAME')), k, e: nz(g(r, 'IDESTILO')).toUpperCase(), t: nz(g(r, 'TALLA_NAME')),
+        m: nz(g(r, 'DEPTO_NAME')) || nz(g(r, 'MARCA')), l: nz(g(r, 'FAMILIA_NAME')).toUpperCase(),
+        d: nz(g(r, 'DPHA2')), tda, tra, tot: 'STK_TOT' in H ? num(g(r, 'STK_TOT')) : tda + tra,
+      });
+    }
+    return { rows: out, stamp: stampFromName(file.name) };
+  }
+
+  /* ---------- RMH ---------- */
+  const RMH_COLS = { storeid: 's', local: 'sn', codigogp: 'k', codcolor: 'e', 'modelo-color': 'e2', descripcion: 'd', stock: 'stock', fl: 'fl', total: 'total', 'suma de stock': 'stock', 'suma de fl': 'fl', 'suma de total': 'total', talla: 't', marca_f: 'm2', marca: 'm1', linea_f: 'l2', linea: 'l1', fechahora: 'ts' };
+
+  function finishRmh(o) {
+    const l2 = nz(o.l2); const l = (l2 && l2 !== '-') ? l2 : nz(o.l1);
+    const m2 = nz(o.m2); const m = (m2 && m2.toLowerCase() !== 'otros') ? m2 : (nz(o.m1) || m2);
+    const stock = num(o.stock); const fl = num(o.fl);
+    return {
+      s: normId(o.s), sn: nz(o.sn), k: nz(o.k).toUpperCase(), e: (nz(o.e) || nz(o.e2)).toUpperCase(),
+      d: nz(o.d), t: nz(o.t), m, l: l.toUpperCase(), stock, fl, total: o.total === undefined || o.total === '' ? stock + fl : num(o.total),
+      ts: num(o.ts),
+    };
+  }
+  function xlDate(serial) {
+    if (!(serial > 30000)) return '';
+    const d = new Date(Math.round((serial - 25569) * 86400000));
+    const p = (n) => String(n).padStart(2, '0');
+    return `${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+  }
+  function mergeRmh(rows) {
+    const map = new Map(); let maxTs = 0;
+    for (const r of rows) {
+      if (!r.s || !r.k) continue;
+      if (r.ts > maxTs) maxTs = r.ts;
+      const key = r.s + '|' + r.k; const p = map.get(key);
+      if (p) { p.stock += r.stock; p.fl += r.fl; p.total += r.total; }
+      else map.set(key, r);
+    }
+    return { rows: [...map.values()], stamp: xlDate(maxTs) };
+  }
+
+  async function rmhFromCsv(file, onProgress) {
+    const { headers, rows } = await csvTable(file, onProgress);
+    const idx = {}; headers.forEach((h, i) => { const f = RMH_COLS[h.toLowerCase()]; if (f && !(f in idx)) idx[f] = i; });
+    if (!('k' in idx) || !('s' in idx)) throw new Error('Este archivo no parece el RMH: faltan las columnas storeid y codigoGp.');
+    const out = rows.map((r) => { const o = {}; for (const f in idx) o[f] = r[idx[f]]; return finishRmh(o); });
+    return { sheets: [], sheet: '', ...mergeRmh(out) };
+  }
+
+  function attrs(tag, name) { const m = new RegExp('\\b' + name + '="([^"]*)"').exec(tag); return m ? m[1] : ''; }
+
+  async function rmhFromXlsx(file, wantedSheet, onProgress) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    onProgress && onProgress(0.05, 'Abriendo el libro');
+    await tick();
+    const meta = fflate.unzipSync(buf, { filter: (f) => f.name === 'xl/workbook.xml' || f.name === 'xl/_rels/workbook.xml.rels' });
+    const wbXml = new TextDecoder().decode(meta['xl/workbook.xml']);
+    const relXml = new TextDecoder().decode(meta['xl/_rels/workbook.xml.rels']);
+    const rels = {}; for (const m of relXml.matchAll(/<Relationship\b[^>]*>/g)) rels[attrs(m[0], 'Id')] = attrs(m[0], 'Target');
+    const sheets = [];
+    for (const m of wbXml.matchAll(/<sheet\b[^>]*>/g)) {
+      const t = rels[attrs(m[0], 'r:id')] || '';
+      sheets.push({ name: entity(attrs(m[0], 'name')), path: t.startsWith('/') ? t.slice(1) : 'xl/' + t });
+    }
+    const byName = (n) => sheets.find((s) => s.name.toLowerCase() === n);
+    let sheet = sheets.find((s) => s.name === wantedSheet) || byName('stock') || byName('consulta');
+    if (!sheet) { const e = new Error('No encontré la hoja Stock ni la hoja Consulta en este libro.'); e.sheets = sheets.map((s) => s.name); throw e; }
+    const dictSheet = byName('stock') && byName('stock').name !== sheet.name ? byName('stock') : null;
+    onProgress && onProgress(0.15, 'Descomprimiendo la hoja ' + sheet.name);
+    await tick();
+    const parts = fflate.unzipSync(buf, { filter: (f) => f.name === sheet.path || f.name === 'xl/sharedStrings.xml' || (dictSheet && f.name === dictSheet.path) });
+    const ss = [];
+    if (parts['xl/sharedStrings.xml']) {
+      const sx = new TextDecoder().decode(parts['xl/sharedStrings.xml']);
+      for (const m of sx.matchAll(/<si>([\s\S]*?)<\/si>|<si\/>/g)) {
+        let t = ''; if (m[1]) for (const x of m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)) t += x[1];
+        ss.push(entity(t));
+      }
+    }
+    const CH = 16 * 1024 * 1024;
+    const rowRe = /<row\b([^>]*?)(?<!\/)>([\s\S]*?)<\/row>/g;
+    const cellRe = /<c r="([A-Z]+)\d+"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+    /* Recorre una hoja fila por fila y entrega cada fila como objeto de campos (sin normalizar). */
+    const scan = async (bytes, onRow, prog) => {
+    const td = new TextDecoder('utf-8');
+    let hdr = null; let fieldOfCol = null;
+    const handle = (inner) => {
+      const cells = [];
+      cellRe.lastIndex = 0;
+      let m;
+      while ((m = cellRe.exec(inner))) {
+        const body = m[3]; if (!body) continue;
+        const t = attrs(m[2], 't');
+        let v;
+        if (t === 'inlineStr') { const a = body.indexOf('<t'); if (a < 0) continue; const s0 = body.indexOf('>', a) + 1; v = entity(body.slice(s0, body.indexOf('</t>', s0))); }
+        else { const a = body.indexOf('<v>'); if (a < 0) continue; v = body.slice(a + 3, body.indexOf('</v>', a)); if (t === 's') v = ss[+v] ?? ''; else if (t === 'str') v = entity(v); }
+        cells.push([colIdx(m[1]), v]);
+      }
+      if (!hdr) {
+        const names = cells.map(([i, v]) => [i, nz(v).toLowerCase()]);
+        if (names.some(([, n]) => n === 'codigogp') && names.some(([, n]) => n === 'storeid' || n === 'local')) {
+          hdr = true; fieldOfCol = {};
+          for (const [i, n] of names) { const f = RMH_COLS[n]; if (f && !Object.values(fieldOfCol).includes(f)) fieldOfCol[i] = f; }
+        }
+        return;
+      }
+      const o = {};
+      for (const [i, v] of cells) { const f = fieldOfCol[i]; if (f) o[f] = v; }
+      if (o.s !== undefined && o.k !== undefined) onRow(o);
+    };
+    let carry = '';
+    for (let i = 0; i < bytes.length; i += CH) {
+      const last = i + CH >= bytes.length;
+      let text = carry + td.decode(bytes.subarray(i, Math.min(i + CH, bytes.length)), { stream: !last });
+      const cut = last ? text.length : Math.max(text.lastIndexOf('</row>') + 6, 0);
+      const work = text.slice(0, cut); carry = text.slice(cut);
+      rowRe.lastIndex = 0;
+      let r; while ((r = rowRe.exec(work))) handle(r[2]);
+      prog && prog(Math.min(1, (i + CH) / bytes.length));
+      await tick();
+    }
+    return hdr ? new Set(Object.values(fieldOfCol)) : null;
+    };
+
+    const out = [];
+    const fields = await scan(parts[sheet.path], (o) => out.push(finishRmh(o)), (f) => onProgress && onProgress(0.2 + 0.4 * f, 'Leyendo ' + sheet.name));
+    if (!fields) throw new Error('En la hoja ' + sheet.name + ' no encontré las columnas storeid y codigoGp.');
+    const merged = mergeRmh(out);
+    const classified = fields.has('m1') || fields.has('m2');
+    let dict = null, stamp = merged.stamp;
+    if (!classified && dictSheet) {
+      /* Consulta trae solo tienda, SKU y cantidad: marca, línea y descripción salen de la hoja Stock del mismo libro. */
+      dict = new Map(); let maxTs = 0;
+      const f2 = await scan(parts[dictSheet.path], (o) => { const r = finishRmh(o); if (r.ts > maxTs) maxTs = r.ts; if (!dict.has(r.k)) dict.set(r.k, r); }, (f) => onProgress && onProgress(0.6 + 0.35 * f, 'Leyendo clasificación de ' + dictSheet.name));
+      if (!f2) dict = null;
+    }
+    let sinClas = 0;
+    if (!classified) {
+      stamp = '';
+      for (const r of merged.rows) {
+        const d = dict && dict.get(r.k);
+        if (d) { r.e = r.e || d.e; r.d = r.d || d.d; r.t = r.t || d.t; r.m = r.m || d.m; r.l = r.l || d.l; }
+        if (!r.e) r.e = r.k.replace(/-[^-]*$/, '');
+        if (!r.t) r.t = r.k.slice(r.k.lastIndexOf('-') + 1);
+        if (!r.m) sinClas++;
+      }
+    }
+    return { sheets: sheets.map((s) => s.name), sheet: sheet.name, rows: merged.rows, stamp, single: !fields.has('total') && !fields.has('fl'), dictFrom: dict ? dictSheet.name : '', sinClas };
+  }
+
+  async function readRmh(file, wantedSheet, onProgress) {
+    if (/\.csv$/i.test(file.name)) return rmhFromCsv(file, onProgress);
+    return rmhFromXlsx(file, wantedSheet, onProgress);
+  }
+
+  return { readRpl, readRmh, nz, num };
+})();
+
+</script>
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (n) => Math.round(n).toLocaleString('es-PE');
+const sgn = (n) => (n === 0 ? '0' : (n > 0 ? '+' : '−') + fmt(Math.abs(n)));
+const pct = (x, d = 1) => (x * 100).toLocaleString('es-PE', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%';
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+/* ---------- estado ---------- */
+const SRC = { rmh: null, rpl: null };             // datos reales cargados
+const S = {
+  tab: 'res', demo: true,
+  opt: { rm: 'total', pm: 'tda', brands: new Set(), lines: new Set(), store: '', mc: '', q: '', onlyDiff: true, minAbs: 1, incl: false },
+  sort: { tda: { k: 'abs', dir: -1 }, mc: { k: 'abs', dir: -1 }, sm: { k: 'abs', dir: -1 }, cob: { k: 'cov', dir: 1 } },
+  limit: { tda: 150, mc: 150, sm: 150, cob: 150 }, open: new Set(),
+};
+let D = { items: new Map(), stores: new Map(), brands: new Map(), lines: new Set() };
+let V = null;       // vista calculada
+let rmhFile = null;
+
+/* ---------- marcas ---------- */
+const BALIAS = { STEVEMADDE: 'STEVEMADDEN', MADDEN: 'STEVEMADDEN' };
+const BLABEL = { STEVEMADDEN: 'STEVE MADDEN', HITEC: 'HI-TEC', MADDENGIRL: 'MADDEN GIRL', NEWBALANCE: 'NEW BALANCE', DOLCEVITA: 'DOLCE VITA' };
+const bkey = (m) => { const u = String(m || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return BALIAS[u] || u; };
+
+/* ---------- construir el cruce ---------- */
+function rebuild(rmhRows, rplRows) {
+  const items = new Map(), stores = new Map(), brands = new Map(), lines = new Set();
+  const store = (id, name) => {
+    let st = stores.get(id);
+    if (!st) { st = { id, name: name || 'Tienda ' + id, inR: false, inP: false }; stores.set(id, st); }
+    else if (name && st.name.startsWith('Tienda ')) st.name = name;
+    return st;
+  };
+  const item = (r) => {
+    const key = r.s + '|' + r.k; let it = items.get(key);
+    if (!it) { it = { s: r.s, k: r.k, e: r.e, t: r.t, d: r.d, m: bkey(r.m), l: r.l, rmh: null, rpl: null }; items.set(key, it); }
+    else { if (!it.e) it.e = r.e; if (!it.d) it.d = r.d; if (!it.t) it.t = r.t; if (!it.l) it.l = r.l; if (!it.m) it.m = bkey(r.m); }
+    if (it.m && !brands.has(it.m)) brands.set(it.m, BLABEL[it.m] || String(r.m).toUpperCase());
+    return it;
+  };
+  for (const r of rplRows) { store(r.s, r.sn).inP = true; item(r).rpl = { tda: r.tda, tot: r.tot }; }
+  for (const r of rmhRows) { store(r.s, r.sn).inR = true; item(r).rmh = { total: r.total, stock: r.stock }; }
+  for (const it of items.values()) {
+    if (!it.m) { it.m = 'SINCLAS'; brands.set('SINCLAS', 'SIN CLASIFICAR'); }
+    if (!it.l) it.l = 'SIN CLASIFICAR';
+    lines.add(it.l);
+    if (!it.e) it.e = it.k.replace(/-[^-]*$/, '');
+    it.h = (it.e + ' ' + it.d + ' ' + it.k).toLowerCase();
+  }
+  D = { items, stores, brands, lines };
+}
+
+/* ---------- vista filtrada ---------- */
+function newG(extra) { return Object.assign({ a: 0, b: 0, abs: 0, n: 0, nd: 0, onlyA: 0, onlyB: 0, both: 0 }, extra); }
+function addG(g, sk) {
+  g.a += sk.a; g.b += sk.b; g.n++;
+  const ab = Math.abs(sk.dl); g.abs += ab;
+  if (sk.dl) { g.nd++; if (sk.a > 0 && sk.b <= 0) g.onlyA += sk.a; else if (sk.a <= 0 && sk.b > 0) g.onlyB += sk.b; else g.both += ab; }
+}
+const estado = (g) => (!g.nd ? 'ok' : (g.a > 0 && g.b <= 0 ? 'a' : (g.a <= 0 && g.b > 0 ? 'b' : 'd')));
+const ELBL = { ok: 'Coincide', a: 'Solo en RMH', b: 'Solo en RPL', d: 'Distinta cantidad' };
+
+function view() {
+  const o = S.opt, q = o.q.trim().toLowerCase();
+  const T = newG({});
+  const byS = new Map(), byM = new Map(), bySM = new Map(), cov = new Map(), byB = new Map();
+  for (const it of D.items.values()) {
+    if (o.brands.size && !o.brands.has(it.m)) continue;
+    if (o.lines.size && !o.lines.has(it.l)) continue;
+    const st = D.stores.get(it.s);
+    const a = it.rmh ? it.rmh[o.rm] : 0, b = it.rpl ? it.rpl[o.pm] : 0;
+    if (!a && !b) continue;
+    let c = cov.get(it.s); if (!c) { c = { a: 0, b: 0 }; cov.set(it.s, c); } c.a += a; c.b += b;
+    if (!o.incl && !(st.inR && st.inP)) continue;
+    if (o.store && it.s !== o.store) continue;
+    if (o.mc && it.e !== o.mc) continue;
+    if (q && !(it.h.includes(q) || st.name.toLowerCase().includes(q))) continue;
+    const sk = { it, a, b, dl: b - a };
+    addG(T, sk);
+    let g = byB.get(it.m); if (!g) { g = newG({ id: it.m, name: D.brands.get(it.m) || it.m }); byB.set(it.m, g); }
+    addG(g, sk);
+    g = byS.get(it.s); if (!g) { g = newG({ id: it.s, name: st.name, mcs: new Set() }); byS.set(it.s, g); }
+    addG(g, sk); if (sk.dl) g.mcs.add(it.e);
+    g = byM.get(it.e); if (!g) { g = newG({ id: it.e, desc: it.d, brand: D.brands.get(it.m) || '', sts: new Set() }); byM.set(it.e, g); }
+    addG(g, sk); if (sk.dl) g.sts.add(it.s);
+    const k2 = it.s + '|' + it.e;
+    g = bySM.get(k2); if (!g) { g = newG({ id: k2, s: it.s, name: st.name, e: it.e, desc: it.d, sk: [] }); bySM.set(k2, g); }
+    addG(g, sk); g.sk.push(sk);
+  }
+  V = { T, byS, byM, bySM, cov, byB };
+}
+
+/* ---------- ordenar / filtrar filas ---------- */
+const sizeKey = (t) => { const x = parseFloat(t); return (isNaN(x) ? 999 : x) + (/X$/i.test(t) ? 0.5 : 0); };
+function pickRows(map, tab, cols) {
+  let rows = [...map.values()];
+  if (S.opt.onlyDiff) rows = rows.filter((g) => g.nd && g.abs >= Math.max(1, S.opt.minAbs));
+  else if (S.opt.minAbs > 1) rows = rows.filter((g) => g.abs >= S.opt.minAbs);
+  const st = S.sort[tab], col = cols.find((c) => c.k === st.k) || cols[0];
+  rows.sort((x, y) => {
+    const vx = col.v(x), vy = col.v(y);
+    const r = (typeof vx === 'string') ? vx.localeCompare(vy, 'es') : vx - vy;
+    return r * st.dir || (y.abs - x.abs);
+  });
+  return rows;
+}
+const deltaPct = (g) => (g.a > 0 ? (g.b - g.a) / g.a : null);
+
+/* ---------- celdas ---------- */
+function dcell(dl, max) {
+  if (!dl) return '<div class="dc"><span class="t muted">0</span></div>';
+  const w = max ? Math.max(3, Math.round(Math.abs(dl) / max * 50)) : 0;
+  return `<div class="dc"><span class="bar"><i class="${dl > 0 ? 'o' : 'u'}" style="width:${w}%"></i></span><span class="t ${dl > 0 ? 'over' : 'under'}">${sgn(dl)}</span></div>`;
+}
+const pcell = (g) => { const p = deltaPct(g); return p === null ? '<span class="muted">—</span>' : `<span class="${p > 0 ? 'over' : p < 0 ? 'under' : ''}">${p > 0 ? '+' : p < 0 ? '−' : ''}${pct(Math.abs(p))}</span>`; };
+const pill = (g) => { const e = estado(g); return `<span class="pill ${e}">${ELBL[e]}</span>`; };
+
+/* ---------- tabla genérica ---------- */
+function table(tab, cols, rows, rowAttr, extraRow) {
+  const st = S.sort[tab], lim = S.limit[tab];
+  const head = cols.map((c) => `<th class="${c.n ? 'n' : ''}" ${c.k === st.k ? `aria-sort="${st.dir > 0 ? 'ascending' : 'descending'}"` : ''}><button type="button" data-sort="${tab}:${c.k}">${esc(c.h)}${c.k === st.k ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('');
+  const max = Math.max(1, ...rows.map((g) => Math.abs(g.b - g.a)));
+  let body = '';
+  rows.slice(0, lim).forEach((g) => {
+    body += `<tr class="click" ${rowAttr(g)}>${cols.map((c) => `<td class="${c.n ? 'n' : ''}">${c.f(g, max)}</td>`).join('')}</tr>`;
+    if (extraRow) body += extraRow(g, cols.length);
+  });
+  const more = rows.length > lim ? `<div class="tools" style="margin:8px 0 0"><span class="muted">Mostrando ${fmt(lim)} de ${fmt(rows.length)}</span><button class="btn" type="button" data-more="${tab}">Mostrar 150 más</button></div>` : '';
+  if (!rows.length) return '<div class="empty">No hay filas con estos filtros. Prueba quitar «Solo con diferencia» o bajar el desvío mínimo.</div>';
+  return `<div class="tools"><span class="muted">${fmt(rows.length)} filas · Δ = RPL − RMH</span><button class="btn" type="button" data-copy="${tab}">Copiar tabla</button></div>
+  <div class="card tw" style="padding:0"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${more}`;
+}
+
+const COLS = {
+  tda: [
+    { k: 'name', h: 'Tienda', v: (g) => g.name, f: (g) => `${esc(g.name)}<span class="id">${esc(g.id)}</span>` },
+    { k: 'a', h: 'RMH', n: 1, v: (g) => g.a, f: (g) => fmt(g.a) },
+    { k: 'b', h: 'RPL', n: 1, v: (g) => g.b, f: (g) => fmt(g.b) },
+    { k: 'dl', h: 'Δ neto', n: 1, v: (g) => g.b - g.a, f: (g, m) => dcell(g.b - g.a, m) },
+    { k: 'pc', h: 'Δ %', n: 1, v: (g) => deltaPct(g) ?? 0, f: pcell },
+    { k: 'abs', h: 'Desvío bruto', n: 1, v: (g) => g.abs, f: (g) => fmt(g.abs) },
+    { k: 'nd', h: 'SKU con dif.', n: 1, v: (g) => g.nd, f: (g) => `${fmt(g.nd)} <span class="muted">/ ${fmt(g.n)}</span>` },
+    { k: 'mcs', h: 'Modelo-color con dif.', n: 1, v: (g) => g.mcs.size, f: (g) => fmt(g.mcs.size) },
+  ],
+  mc: [
+    { k: 'id', h: 'Modelo-color', v: (g) => g.id, f: (g) => `<span class="num">${esc(g.id)}</span><span class="ds">${esc(g.desc)}${g.brand ? ' · ' + esc(g.brand) : ''}</span>` },
+    { k: 'a', h: 'RMH', n: 1, v: (g) => g.a, f: (g) => fmt(g.a) },
+    { k: 'b', h: 'RPL', n: 1, v: (g) => g.b, f: (g) => fmt(g.b) },
+    { k: 'dl', h: 'Δ neto', n: 1, v: (g) => g.b - g.a, f: (g, m) => dcell(g.b - g.a, m) },
+    { k: 'pc', h: 'Δ %', n: 1, v: (g) => deltaPct(g) ?? 0, f: pcell },
+    { k: 'abs', h: 'Desvío bruto', n: 1, v: (g) => g.abs, f: (g) => fmt(g.abs) },
+    { k: 'sts', h: 'Tiendas con dif.', n: 1, v: (g) => g.sts.size, f: (g) => fmt(g.sts.size) },
+    { k: 'es', h: 'Estado', v: (g) => estado(g), f: pill },
+  ],
+  sm: [
+    { k: 'name', h: 'Tienda', v: (g) => g.name, f: (g) => `${esc(g.name)}<span class="id">${esc(g.s)}</span>` },
+    { k: 'e', h: 'Modelo-color', v: (g) => g.e, f: (g) => `<span class="num">${esc(g.e)}</span><span class="ds">${esc(g.desc)}</span>` },
+    { k: 'a', h: 'RMH', n: 1, v: (g) => g.a, f: (g) => fmt(g.a) },
+    { k: 'b', h: 'RPL', n: 1, v: (g) => g.b, f: (g) => fmt(g.b) },
+    { k: 'dl', h: 'Δ neto', n: 1, v: (g) => g.b - g.a, f: (g, m) => dcell(g.b - g.a, m) },
+    { k: 'abs', h: 'Desvío bruto', n: 1, v: (g) => g.abs, f: (g) => fmt(g.abs) },
+    { k: 'nd', h: 'Tallas con dif.', n: 1, v: (g) => g.nd, f: (g) => `${fmt(g.nd)} <span class="muted">/ ${fmt(g.n)}</span>` },
+    { k: 'es', h: 'Estado', v: (g) => estado(g), f: pill },
+  ],
+};
+
+function sizesRow(g, span) {
+  if (!S.open.has(g.id)) return '';
+  const sk = [...g.sk].sort((x, y) => sizeKey(x.it.t) - sizeKey(y.it.t));
+  const cells = sk.map((x) => `<span class="sz ${x.dl ? 'diff' : ''}"><b>Talla ${esc(x.it.t || '?')}</b><span class="muted">RMH ${fmt(x.a)}</span><span class="muted">RPL ${fmt(x.b)}</span>${x.dl ? `<b class="${x.dl > 0 ? 'over' : 'under'}">Δ ${sgn(x.dl)}</b>` : ''}</span>`).join('');
+  return `<tr class="sub"><td colspan="${span}"><div class="sizes">${cells}</div></td></tr>`;
+}
+
+/* ---------- pestañas ---------- */
+function viewTda() {
+  const rows = pickRows(V.byS, 'tda', COLS.tda);
+  return table('tda', COLS.tda, rows, (g) => `data-go-store="${esc(g.id)}"`);
+}
+function viewMc() {
+  const rows = pickRows(V.byM, 'mc', COLS.mc);
+  return table('mc', COLS.mc, rows, (g) => `data-go-mc="${esc(g.id)}"`);
+}
+function viewSm() {
+  const rows = pickRows(V.bySM, 'sm', COLS.sm);
+  return `<p class="note">Haz clic en una fila para ver las tallas.</p>` + table('sm', COLS.sm, rows, (g) => `data-open="${esc(g.id)}"`, sizesRow);
+}
+
+function covRows() {
+  const rows = [];
+  for (const st of D.stores.values()) {
+    const c = V.cov.get(st.id) || { a: 0, b: 0 };
+    const both = st.inR && st.inP;
+    rows.push({ id: st.id, name: st.name, inR: st.inR, inP: st.inP, a: c.a, b: c.b, cv: both ? 2 : (st.inP ? 0 : 1), abs: Math.abs(c.a - c.b) });
+  }
+  return rows;
+}
+const COV_COLS = [
+  { k: 'name', h: 'Tienda', v: (g) => g.name, f: (g) => `${esc(g.name)}<span class="id">${esc(g.id)}</span>` },
+  { k: 'inR', h: 'En RMH', v: (g) => +g.inR, f: (g) => (g.inR ? 'Sí' : '<span class="over">No</span>') },
+  { k: 'inP', h: 'En RPL', v: (g) => +g.inP, f: (g) => (g.inP ? 'Sí' : '<span class="over">No</span>') },
+  { k: 'a', h: 'RMH', n: 1, v: (g) => g.a, f: (g) => fmt(g.a) },
+  { k: 'b', h: 'RPL', n: 1, v: (g) => g.b, f: (g) => fmt(g.b) },
+  { k: 'cov', h: 'Cruce', v: (g) => g.cv, f: (g) => (g.cv === 2 ? '<span class="pill">Comparada</span>' : g.cv === 0 ? '<span class="pill b">Solo en RPL</span>' : '<span class="pill a">Solo en RMH</span>') },
+];
+function viewCob() {
+  const all = covRows(); const st = S.sort.cob, col = COV_COLS.find((c) => c.k === st.k) || COV_COLS[5];
+  all.sort((x, y) => { const vx = col.v(x), vy = col.v(y); return ((typeof vx === 'string') ? vx.localeCompare(vy, 'es') : vx - vy) * st.dir || y.abs - x.abs; });
+  const out = all.filter((g) => g.cv !== 2).length;
+  const note = `<p class="note">${out ? `${out} de ${all.length} tiendas están en un solo archivo. Quedan fuera del cruce para no mostrar como diferencia lo que es un archivo incompleto. Los pares son los de la marca y línea elegidas.` : 'Todas las tiendas están en los dos archivos.'}</p>`;
+  const rows = all;
+  const head = COV_COLS.map((c) => `<th class="${c.n ? 'n' : ''}"><button type="button" data-sort="cob:${c.k}">${esc(c.h)}${c.k === st.k ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('');
+  const body = rows.map((g) => `<tr>${COV_COLS.map((c) => `<td class="${c.n ? 'n' : ''}">${c.f(g)}</td>`).join('')}</tr>`).join('');
+  return note + `<div class="tools"><span class="muted">${all.length} tiendas</span><button class="btn" type="button" data-copy="cob">Copiar tabla</button></div><div class="card tw" style="padding:0"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function viewRes() {
+  const T = V.T;
+  if (!T.n) return '<div class="card empty">No hay datos con estos filtros.</div>';
+  const dl = T.b - T.a, p = T.a > 0 ? dl / T.a : 0;
+  const nStores = [...V.byS.values()].filter((g) => g.nd).length;
+  const stores = [...V.byS.values()].sort((x, y) => Math.abs(y.b - y.a) - Math.abs(x.b - x.a) || y.abs - x.abs);
+  const worstS = [...V.byS.values()].sort((x, y) => y.abs - x.abs)[0];
+  const mcs = [...V.byM.values()].filter((g) => g.nd).sort((x, y) => y.abs - x.abs);
+  const exact = 1 - T.nd / T.n;
+  const out = covRows().filter((g) => g.cv !== 2).length;
+  const sents = [];
+  sents.push(dl === 0 ? `RMH y RPL tienen el mismo total: <b>${fmt(T.a)}</b> pares.`
+    : `RPL tiene <b class="${dl > 0 ? 'over' : 'under'}">${fmt(Math.abs(dl))} pares ${dl > 0 ? 'de más' : 'de menos'}</b> que RMH (${fmt(T.b)} contra ${fmt(T.a)}, ${p > 0 ? '+' : p < 0 ? '−' : ''}${pct(Math.abs(p))}).`);
+  sents.push(`Coinciden exacto <b>${pct(exact)}</b> de los SKU-tienda. Los otros ${fmt(T.nd)} suman <b>${fmt(T.abs)} pares</b> de desvío bruto, repartidos en ${fmt(nStores)} tiendas.`);
+  if (exact < 0.8) sents.push(`<span class="muted">Una coincidencia tan baja suele indicar que los dos archivos no son del mismo corte, o que la tabla dinámica de la hoja elegida no se actualizó. Puedes probar otra hoja del mismo libro desde el selector de hoja.</span>`);
+  if (worstS && worstS.abs) sents.push(`La tienda con más desvío es <b>${esc(worstS.name)}</b> (${fmt(worstS.abs)} pares brutos, Δ neto ${sgn(worstS.b - worstS.a)}).` + (mcs[0] ? ` El modelo-color con más desvío es <b>${esc(mcs[0].id)}</b> (${fmt(mcs[0].abs)}).` : ''));
+  const ts = (SRC.rmh && SRC.rpl) ? stampGap(SRC.rmh.stamp, SRC.rpl.stamp) : '';
+  if (ts) sents.push(ts);
+  if (out) sents.push(`<span class="muted">${out} tiendas están en un solo archivo y no entran al cruce (pestaña Cobertura).</span>`);
+
+  const maxS = Math.max(1, ...stores.slice(0, 18).map((g) => Math.abs(g.b - g.a)));
+  const bars = stores.filter((g) => g.nd).slice(0, 18).map((g) => {
+    const d = g.b - g.a, w = Math.round(Math.abs(d) / maxS * 50);
+    return `<button class="srow" type="button" data-go-store="${esc(g.id)}" title="${esc(g.name)}"><span class="nm">${esc(g.name)}</span><span class="tr">${d ? `<i class="${d > 0 ? 'o' : 'u'}" style="width:${Math.max(w, 1)}%"></i>` : ''}</span><span class="vl ${d > 0 ? 'over' : d < 0 ? 'under' : ''}">${sgn(d)}</span></button>`;
+  }).join('') || '<div class="empty">Sin diferencias.</div>';
+  const top = mcs.slice(0, 10).map((g) => `<button class="mcrow" type="button" data-go-mc="${esc(g.id)}"><span><span class="c">${esc(g.id)}</span><span class="ds">${esc(g.desc)}</span></span><span class="v ${g.b - g.a > 0 ? 'over' : g.b - g.a < 0 ? 'under' : ''}">${sgn(g.b - g.a)}</span><span class="v muted">${fmt(g.abs)} bruto</span></button>`).join('') || '<div class="empty">Sin diferencias.</div>';
+
+  const brs = [...V.byB.values()].sort((x, y) => y.abs - x.abs || y.a - x.a);
+  const brandCard = brs.length > 1 ? `<section class="card"><h2>Por marca</h2><div class="tw"><table><thead><tr><th>Marca</th><th class="n">RMH</th><th class="n">RPL</th><th class="n">Δ neto</th><th class="n">Δ %</th><th class="n">Desvío bruto</th><th class="n">SKU que coinciden</th></tr></thead><tbody>${brs.map((g) => `<tr class="click" data-go-brand="${esc(g.id)}"><td>${esc(g.name)}</td><td class="n">${fmt(g.a)}</td><td class="n">${fmt(g.b)}</td><td class="n ${g.b - g.a > 0 ? 'over' : g.b - g.a < 0 ? 'under' : ''}">${sgn(g.b - g.a)}</td><td class="n">${pcell(g)}</td><td class="n">${fmt(g.abs)}</td><td class="n">${pct(1 - g.nd / g.n)}</td></tr>`).join('')}</tbody></table></div></section>` : '';
+  return `<div class="card read">${sents.map((s) => `<p>${s}</p>`).join('')}</div>
+  <div class="kpis">
+    <div class="kpi"><div class="l">RMH</div><div class="v">${fmt(T.a)}</div><div class="d">pares en tienda · ${SRC.rmh && SRC.rmh.single ? 'Suma de stock' : S.opt.rm === 'total' ? 'stock + fl' : 'solo stock'}</div></div>
+    <div class="kpi"><div class="l">RPL</div><div class="v">${fmt(T.b)}</div><div class="d">pares · ${S.opt.pm === 'tda' ? 'STK_TDA' : 'STK_TDA + tránsito'}</div></div>
+    <div class="kpi"><div class="l">Δ neto (RPL − RMH)</div><div class="v ${dl > 0 ? 'over' : dl < 0 ? 'under' : ''}">${sgn(dl)}</div><div class="d">${T.a > 0 ? (p > 0 ? '+' : p < 0 ? '−' : '') + pct(Math.abs(p)) + ' sobre RMH' : '—'}</div></div>
+    <div class="kpi"><div class="l">Desvío bruto</div><div class="v">${fmt(T.abs)}</div><div class="d">suma de |Δ| por SKU · ${T.a > 0 ? pct(T.abs / T.a) + ' de RMH' : '—'}</div></div>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><div class="l">RMH tiene, RPL no</div><div class="v under">${fmt(T.onlyA)}</div><div class="d">pares que el RPL no ve</div></div>
+    <div class="kpi"><div class="l">RPL tiene, RMH no</div><div class="v over">${fmt(T.onlyB)}</div><div class="d">pares que RMH no confirma</div></div>
+    <div class="kpi"><div class="l">Ambos, distinta cantidad</div><div class="v">${fmt(T.both)}</div><div class="d">pares de desvío en SKU presentes en los dos</div></div>
+  </div>
+  ${brandCard}
+  <div class="two">
+    <section class="card"><h2>Δ neto por tienda</h2>
+      <div class="legend"><span><i style="background:var(--over)"></i>RPL de más</span><span><i style="background:var(--under)"></i>RPL de menos</span><span class="muted">clic para ver la tienda</span></div>
+      <div class="sbars">${bars}</div></section>
+    <section class="card"><h2>Modelo-color con más desvío</h2><div class="mclist">${top}</div></section>
+  </div>`;
+}
+
+function stampGap(a, b) {
+  const p = (s) => { const m = /(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/.exec(s || ''); return m ? new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) : null; };
+  const x = p(a), y = p(b); if (!x || !y) return '';
+  const h = (x - y) / 3600000;
+  if (Math.abs(h) < 0.5) return '';
+  return `<span class="muted">El corte de RMH (${esc(a)}) es ${fmt(Math.abs(h))} h ${h > 0 ? 'posterior' : 'anterior'} al del RPL (${esc(b)}). Parte de la diferencia puede ser venta o ingreso entre ambos cortes.</span>`;
+}
+
+/* ---------- render ---------- */
+function render() {
+  view();
+  for (const b of document.querySelectorAll('#tabs button')) b.setAttribute('aria-selected', b.dataset.tab === S.tab);
+  const fn = { res: viewRes, tda: viewTda, mc: viewMc, sm: viewSm, cob: viewCob }[S.tab];
+  $('#panel').innerHTML = fn();
+  const d = [];
+  if (S.opt.mc) d.push(`<span class="drill">Modelo-color ${esc(S.opt.mc)}<button type="button" data-clear="mc" aria-label="Quitar filtro de modelo-color">×</button></span>`);
+  $('#drills').innerHTML = d.join('');
+  const dm = $('#demo');
+  if (S.demo) {
+    dm.hidden = false;
+    dm.textContent = 'Datos de ejemplo, no son tus cifras. ' + (!SRC.rmh && !SRC.rpl ? 'Carga el RMH y el RPL para ver el cruce real.' : (!SRC.rmh ? 'Falta cargar el RMH.' : 'Falta cargar el RPL.'));
+  } else dm.hidden = true;
+}
+
+function syncControls() {
+  const o = S.opt;
+  for (const b of $('#seg-rm').children) b.setAttribute('aria-pressed', b.dataset.v === o.rm);
+  for (const b of $('#seg-pm').children) b.setAttribute('aria-pressed', b.dataset.v === o.pm);
+  $('#g-rm').hidden = !!(SRC.rmh && SRC.rmh.single);
+  const chips = (host, items, set, attr) => {
+    host.querySelectorAll('.chip').forEach((c) => c.remove());
+    const all = document.createElement('button'); all.type = 'button'; all.className = 'chip'; all.dataset.all = attr; all.textContent = 'Todas'; all.setAttribute('aria-pressed', set.size === 0); host.appendChild(all);
+    for (const [k, label] of items) { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.dataset[attr] = k; b.textContent = label; b.setAttribute('aria-pressed', set.has(k)); host.appendChild(b); }
+  };
+  chips($('#g-brand'), [...D.brands.entries()].sort((x, y) => x[1].localeCompare(y[1])), o.brands, 'brand');
+  chips($('#g-line'), [...D.lines].sort().map((l) => [l, l]), o.lines, 'line');
+  const sel = $('#sel-store');
+  const list = [...D.stores.values()].filter((s) => o.incl || (s.inR && s.inP)).sort((x, y) => x.name.localeCompare(y.name, 'es'));
+  sel.innerHTML = '<option value="">Todas las tiendas</option>' + list.map((s) => `<option value="${esc(s.id)}">${esc(s.name)} (${esc(s.id)})</option>`).join('');
+  sel.value = o.store;
+}
+
+function setDefaults() {
+  const o = S.opt;
+  o.brands = new Set(); o.lines = new Set();   // sin selección = todas las marcas y líneas
+  o.store = ''; o.mc = ''; o.q = ''; $('#q').value = '';
+  S.open.clear(); for (const k in S.limit) S.limit[k] = 150;
+}
+
+/* ---------- eventos ---------- */
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button, tr[data-go-store], tr[data-go-mc], tr[data-go-brand], tr[data-open]'); if (!t) return;
+  const o = S.opt, d = t.dataset;
+  if (d.tab) { S.tab = d.tab; render(); return; }
+  if (t.closest('#seg-rm')) { o.rm = d.v; return refresh(); }
+  if (t.closest('#seg-pm')) { o.pm = d.v; return refresh(); }
+  if (d.all) { (d.all === 'brand' ? o.brands : o.lines).clear(); return refresh(); }
+  if (d.goBrand !== undefined) { o.brands = new Set([d.goBrand]); syncControls(); S.tab = 'tda'; return render(); }
+  if (d.brand !== undefined) { o.brands.has(d.brand) ? o.brands.delete(d.brand) : o.brands.add(d.brand); return refresh(); }
+  if (d.line !== undefined) { o.lines.has(d.line) ? o.lines.delete(d.line) : o.lines.add(d.line); return refresh(); }
+  if (d.goStore !== undefined) { o.store = d.goStore; $('#sel-store').value = o.store; S.tab = 'sm'; return render(); }
+  if (d.goMc !== undefined) { o.mc = d.goMc; S.tab = 'sm'; return render(); }
+  if (d.open !== undefined) { S.open.has(d.open) ? S.open.delete(d.open) : S.open.add(d.open); return render(); }
+  if (d.clear === 'mc') { o.mc = ''; return render(); }
+  if (d.sort) { const [tab, k] = d.sort.split(':'), s = S.sort[tab]; if (s.k === k) s.dir = -s.dir; else { s.k = k; s.dir = (k === 'name' || k === 'id' || k === 'e' || k === 'es') ? 1 : -1; } return render(); }
+  if (d.more) { S.limit[d.more] += 150; return render(); }
+  if (d.copy) return copyTable(d.copy);
+});
+const refresh = () => { syncControls(); render(); };
+$('#sel-store').addEventListener('change', (e) => { S.opt.store = e.target.value; render(); });
+$('#q').addEventListener('input', (e) => { S.opt.q = e.target.value; render(); });
+$('#ck-diff').addEventListener('change', (e) => { S.opt.onlyDiff = e.target.checked; render(); });
+$('#min').addEventListener('input', (e) => { S.opt.minAbs = Math.max(0, parseInt(e.target.value, 10) || 0); render(); });
+$('#ck-incl').addEventListener('change', (e) => { S.opt.incl = e.target.checked; refresh(); });
+
+function copyTable(tab) {
+  let head, lines;
+  if (tab === 'cob') { head = ['Id', 'Tienda', 'En RMH', 'En RPL', 'RMH', 'RPL']; lines = covRows().map((g) => [g.id, g.name, g.inR ? 'Sí' : 'No', g.inP ? 'Sí' : 'No', g.a, g.b]); }
+  else {
+    const map = { tda: V.byS, mc: V.byM, sm: V.bySM }[tab];
+    const rows = pickRows(map, tab, COLS[tab]);
+    head = { tda: ['Id', 'Tienda', 'RMH', 'RPL', 'Δ neto', 'Desvío bruto', 'SKU con dif.', 'SKU'], mc: ['Modelo-color', 'Descripción', 'RMH', 'RPL', 'Δ neto', 'Desvío bruto', 'SKU con dif.', 'SKU'], sm: ['Id tienda', 'Tienda', 'Modelo-color', 'RMH', 'RPL', 'Δ neto', 'Desvío bruto', 'SKU con dif.', 'SKU'] }[tab];
+    lines = rows.map((g) => (tab === 'tda' ? [g.id, g.name] : tab === 'mc' ? [g.id, g.desc] : [g.s, g.name, g.e]).concat([g.a, g.b, g.b - g.a, g.abs, g.nd, g.n]));
+  }
+  const txt = [head, ...lines].map((r) => r.join('\t')).join('\n');
+  const done = () => { const b = document.querySelector(`[data-copy="${tab}"]`); if (b) { b.textContent = 'Copiado'; setTimeout(() => { b.textContent = 'Copiar tabla'; }, 1500); } };
+  const fallback = () => { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (_) { /* sin portapapeles */ } ta.remove(); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fallback); else fallback();
+}
+
+/* ---------- carga de archivos ---------- */
+function progress(which, f, msg) {
+  const pg = $('#pg-' + which); pg.hidden = false; pg.firstElementChild.style.width = Math.round(f * 100) + '%';
+  if (msg) $('#st-' + which).textContent = msg + '…';
+}
+function drop(which, loader) {
+  const box = $('#drop-' + which), inp = $('#file-' + which);
+  inp.addEventListener('change', () => { if (inp.files[0]) loader(inp.files[0]); });
+  ['dragenter', 'dragover'].forEach((ev) => box.addEventListener(ev, (e) => { e.preventDefault(); box.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach((ev) => box.addEventListener(ev, (e) => { e.preventDefault(); box.classList.remove('over'); }));
+  box.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) loader(f); });
+}
+async function loadRpl(file) {
+  const st = $('#st-rpl'); $('#drop-rpl').classList.remove('ok');
+  try {
+    progress('rpl', 0.1, 'Leyendo ' + file.name);
+    const r = await Parse.readRpl(file, (f) => progress('rpl', f));
+    SRC.rpl = r;
+    const stores = new Set(r.rows.map((x) => x.s)).size;
+    st.innerHTML = `<b>${esc(file.name)}</b><br>${fmt(r.rows.length)} filas · ${stores} tiendas${r.stamp ? ' · corte ' + esc(r.stamp) : ''}`;
+    $('#drop-rpl').classList.add('ok');
+  } catch (err) { SRC.rpl = null; st.innerHTML = `<span class="err">${esc(err.message || err)}</span>`; }
+  $('#pg-rpl').hidden = true; combine();
+}
+async function loadRmh(file, sheet) {
+  rmhFile = file; const st = $('#st-rmh'); $('#drop-rmh').classList.remove('ok');
+  try {
+    progress('rmh', 0.02, 'Leyendo ' + file.name);
+    const r = await Parse.readRmh(file, sheet, (f, m) => progress('rmh', f, m));
+    SRC.rmh = r;
+    const stores = new Set(r.rows.map((x) => x.s)).size;
+    const sel = r.sheets.length > 1 ? `<br><select id="sel-sheet" aria-label="Hoja del libro">${r.sheets.map((n) => `<option ${n === r.sheet ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>` : '';
+    const cls = r.dictFrom ? `<br>Marca y línea desde la hoja ${esc(r.dictFrom)}${r.sinClas ? ` · ${fmt(r.sinClas)} SKU sin clasificar` : ''}` : '';
+    st.innerHTML = `<b>${esc(file.name)}</b><br>${r.sheet ? 'Hoja ' + esc(r.sheet) + ' · ' : ''}${fmt(r.rows.length)} filas · ${stores} tiendas${r.stamp ? ' · corte ' + esc(r.stamp) : ''}${cls}${sel}`;
+    const ss = $('#sel-sheet'); if (ss) ss.addEventListener('change', () => loadRmh(rmhFile, ss.value));
+    $('#drop-rmh').classList.add('ok');
+  } catch (err) {
+    SRC.rmh = null;
+    let html = `<span class="err">${esc(err.message || err)}</span>`;
+    if (err.sheets) { html += `<br>Elige la hoja: <select id="sel-sheet" aria-label="Hoja del libro"><option value="">…</option>${err.sheets.map((n) => `<option>${esc(n)}</option>`).join('')}</select>`; st.innerHTML = html; const ss = $('#sel-sheet'); ss.addEventListener('change', () => ss.value && loadRmh(rmhFile, ss.value)); }
+    else st.innerHTML = html;
+  }
+  $('#pg-rmh').hidden = true; combine();
+}
+function combine() {
+  if (SRC.rmh && SRC.rpl) {
+    S.demo = false; rebuild(SRC.rmh.rows, SRC.rpl.rows); setDefaults(); S.tab = 'res';
+  } else if (!S.demo) { S.demo = true; loadDemo(); }
+  syncControls(); render();
+}
+drop('rmh', (f) => loadRmh(f)); drop('rpl', loadRpl);
+
+/* ---------- datos de ejemplo ---------- */
+function loadDemo() {
+  let seed = 7; const rnd = () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const stores = [['100', 'Merrell Cusco'], ['5', 'Merrell Jockey'], ['7', 'Merrell Trujillo'], ['123', 'Merrell Mall del Sur'], ['124', 'Merrell Puruchuco'], ['62', 'Merrell Salaverry']];
+  const onlyP = [['109', 'Merrell PLN'], ['119', 'Merrell Parque la Molina']];
+  const names = ['MOAB SPEED 2', 'SNOVA MID', 'ANTORA 3', 'SPEEDARC PEAK', 'WILDWOOD', 'JUNGLE MOC', 'AGILITY PEAK 5', 'LONG SKY 2', 'HUT MOC', 'SIREN 2', 'ACCESS GRAND', 'MOAB 3 GTX'];
+  const sizes = ['4', '5', '6', '7', '8', '9', '10', '11'];
+  const rmh = [], rpl = [];
+  for (let m = 0; m < 28; m++) {
+    const e = 'J0' + (38200 + m * 37) + '-0', d = names[m % names.length];
+    for (const [s, sn] of stores.concat(onlyP)) {
+      if (rnd() < 0.35) continue;
+      for (const t of sizes) {
+        const base = rnd() < 0.6 ? 0 : 1 + (rnd() < 0.25 ? 1 : 0); if (!base) continue;
+        let a = base, b = base; const r = rnd();
+        if (r < 0.07) b = 0; else if (r < 0.13) b = base + 1; else if (r < 0.17) a = 0;
+        const k = e + '-' + t;
+        if (!onlyP.some((x) => x[0] === s) && a) rmh.push({ s, sn, k, e, d, t, m: 'MERRELL', l: 'CALZADO', stock: a, fl: 0, total: a });
+        if (b) rpl.push({ s, sn, k, e, d, t, m: 'MERRELL', l: 'CALZADO', tda: b, tra: 0, tot: b });
+      }
+    }
+  }
+  rebuild(rmh, rpl); setDefaults();
+}
+
+loadDemo(); syncControls(); render();
+</script>
+
+</html>
