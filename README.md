@@ -26,10 +26,11 @@ Hasta que cargues los dos archivos, la página muestra datos de ejemplo marcados
 - **Desvío bruto** es la suma de |Δ| por SKU. Muestra las diferencias que el neto compensa entre sí.
 - Las tiendas que están en un solo archivo quedan fuera del cruce, para no contarlas como diferencia. Se ven en la pestaña Cobertura.
 - Funciona para todas las marcas y líneas. Sin selección se comparan todas.
+- «Excluir solo RMH» quita los SKU que RMH tiene en una tienda y el RPL no ve, y recalcula todos los totales.
 
 ## Pestañas
 
-Resumen · Por tienda · Por modelo-color · Tienda × modelo-color (con las tallas de cada fila) · Cobertura.
+Resumen (con tablas por marca y por línea) · Por tienda · Por modelo-color · Tienda × modelo-color (con las tallas de cada fila) · Cobertura.
 
 Cada tabla se puede ordenar y copiar para pegarla en Excel.
 

@@ -191,6 +191,7 @@ tr.sub td { background: var(--surface-2); padding: 8px 16px; }
       <div class="fgrp"><span class="flabel">Tienda</span><select class="in" id="sel-store" aria-label="Tienda"></select></div>
       <div class="fgrp"><input class="in" type="search" id="q" placeholder="Buscar modelo, color o tienda" aria-label="Buscar"></div>
       <label class="ck"><input type="checkbox" id="ck-diff" checked> Solo con diferencia</label>
+      <label class="ck" title="Quita los SKU que RMH tiene en la tienda y el RPL no ve (RPL en 0 o sin fila). Cambia todos los totales."><input type="checkbox" id="ck-exa"> Excluir solo RMH</label>
       <div class="fgrp"><span class="flabel">Desvío mín.</span><input class="in" type="number" id="min" min="0" value="1" aria-label="Desvío mínimo en pares"></div>
       <label class="ck" title="Tiendas que están en un solo archivo. Por defecto quedan fuera para no inflar la diferencia."><input type="checkbox" id="ck-incl"> Incluir tiendas sin cruce</label>
       <span id="drills"></span>
@@ -447,7 +448,7 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 const SRC = { rmh: null, rpl: null };             // datos reales cargados
 const S = {
   tab: 'res', demo: true,
-  opt: { rm: 'total', pm: 'tda', brands: new Set(), lines: new Set(), store: '', mc: '', q: '', onlyDiff: true, minAbs: 1, incl: false },
+  opt: { rm: 'total', pm: 'tda', brands: new Set(), lines: new Set(), store: '', mc: '', q: '', onlyDiff: true, exOnlyA: false, minAbs: 1, incl: false },
   sort: { tda: { k: 'abs', dir: -1 }, mc: { k: 'abs', dir: -1 }, sm: { k: 'abs', dir: -1 }, cob: { k: 'cov', dir: 1 } },
   limit: { tda: 150, mc: 150, sm: 150, cob: 150 }, open: new Set(),
 };
@@ -501,7 +502,7 @@ const ELBL = { ok: 'Coincide', a: 'Solo en RMH', b: 'Solo en RPL', d: 'Distinta 
 function view() {
   const o = S.opt, q = o.q.trim().toLowerCase();
   const T = newG({});
-  const byS = new Map(), byM = new Map(), bySM = new Map(), cov = new Map(), byB = new Map();
+  const byS = new Map(), byM = new Map(), bySM = new Map(), cov = new Map(), byB = new Map(), byL = new Map();
   for (const it of D.items.values()) {
     if (o.brands.size && !o.brands.has(it.m)) continue;
     if (o.lines.size && !o.lines.has(it.l)) continue;
@@ -509,6 +510,7 @@ function view() {
     const a = it.rmh ? it.rmh[o.rm] : 0, b = it.rpl ? it.rpl[o.pm] : 0;
     if (!a && !b) continue;
     let c = cov.get(it.s); if (!c) { c = { a: 0, b: 0 }; cov.set(it.s, c); } c.a += a; c.b += b;
+    if (o.exOnlyA && a > 0 && b <= 0) continue;   // SKU que RMH tiene y el RPL no ve
     if (!o.incl && !(st.inR && st.inP)) continue;
     if (o.store && it.s !== o.store) continue;
     if (o.mc && it.e !== o.mc) continue;
@@ -517,15 +519,17 @@ function view() {
     addG(T, sk);
     let g = byB.get(it.m); if (!g) { g = newG({ id: it.m, name: D.brands.get(it.m) || it.m }); byB.set(it.m, g); }
     addG(g, sk);
+    g = byL.get(it.l); if (!g) { g = newG({ id: it.l, name: it.l }); byL.set(it.l, g); }
+    addG(g, sk);
     g = byS.get(it.s); if (!g) { g = newG({ id: it.s, name: st.name, mcs: new Set() }); byS.set(it.s, g); }
     addG(g, sk); if (sk.dl) g.mcs.add(it.e);
-    g = byM.get(it.e); if (!g) { g = newG({ id: it.e, desc: it.d, brand: D.brands.get(it.m) || '', sts: new Set() }); byM.set(it.e, g); }
+    g = byM.get(it.e); if (!g) { g = newG({ id: it.e, desc: it.d, brand: D.brands.get(it.m) || '', line: it.l, sts: new Set() }); byM.set(it.e, g); }
     addG(g, sk); if (sk.dl) g.sts.add(it.s);
     const k2 = it.s + '|' + it.e;
-    g = bySM.get(k2); if (!g) { g = newG({ id: k2, s: it.s, name: st.name, e: it.e, desc: it.d, sk: [] }); bySM.set(k2, g); }
+    g = bySM.get(k2); if (!g) { g = newG({ id: k2, s: it.s, name: st.name, e: it.e, desc: it.d, line: it.l, sk: [] }); bySM.set(k2, g); }
     addG(g, sk); g.sk.push(sk);
   }
-  V = { T, byS, byM, bySM, cov, byB };
+  V = { T, byS, byM, bySM, cov, byB, byL };
 }
 
 /* ---------- ordenar / filtrar filas ---------- */
@@ -582,6 +586,7 @@ const COLS = {
   ],
   mc: [
     { k: 'id', h: 'Modelo-color', v: (g) => g.id, f: (g) => `<span class="num">${esc(g.id)}</span><span class="ds">${esc(g.desc)}${g.brand ? ' · ' + esc(g.brand) : ''}</span>` },
+    { k: 'line', h: 'Línea', v: (g) => g.line, f: (g) => esc(g.line) },
     { k: 'a', h: 'RMH', n: 1, v: (g) => g.a, f: (g) => fmt(g.a) },
     { k: 'b', h: 'RPL', n: 1, v: (g) => g.b, f: (g) => fmt(g.b) },
     { k: 'dl', h: 'Δ neto', n: 1, v: (g) => g.b - g.a, f: (g, m) => dcell(g.b - g.a, m) },
@@ -593,6 +598,7 @@ const COLS = {
   sm: [
     { k: 'name', h: 'Tienda', v: (g) => g.name, f: (g) => `${esc(g.name)}<span class="id">${esc(g.s)}</span>` },
     { k: 'e', h: 'Modelo-color', v: (g) => g.e, f: (g) => `<span class="num">${esc(g.e)}</span><span class="ds">${esc(g.desc)}</span>` },
+    { k: 'line', h: 'Línea', v: (g) => g.line, f: (g) => esc(g.line) },
     { k: 'a', h: 'RMH', n: 1, v: (g) => g.a, f: (g) => fmt(g.a) },
     { k: 'b', h: 'RPL', n: 1, v: (g) => g.b, f: (g) => fmt(g.b) },
     { k: 'dl', h: 'Δ neto', n: 1, v: (g) => g.b - g.a, f: (g, m) => dcell(g.b - g.a, m) },
@@ -665,6 +671,7 @@ function viewRes() {
   sents.push(dl === 0 ? `RMH y RPL tienen el mismo total: <b>${fmt(T.a)}</b> pares.`
     : `RPL tiene <b class="${dl > 0 ? 'over' : 'under'}">${fmt(Math.abs(dl))} pares ${dl > 0 ? 'de más' : 'de menos'}</b> que RMH (${fmt(T.b)} contra ${fmt(T.a)}, ${p > 0 ? '+' : p < 0 ? '−' : ''}${pct(Math.abs(p))}).`);
   sents.push(`Coinciden exacto <b>${pct(exact)}</b> de los SKU-tienda. Los otros ${fmt(T.nd)} suman <b>${fmt(T.abs)} pares</b> de desvío bruto, repartidos en ${fmt(nStores)} tiendas.`);
+  if (S.opt.exOnlyA) sents.push('<span class="muted">Filtro activo: no se cuentan los SKU que solo están en RMH.</span>');
   if (exact < 0.8) sents.push(`<span class="muted">Una coincidencia tan baja suele indicar que los dos archivos no son del mismo corte, o que la tabla dinámica de la hoja elegida no se actualizó. Puedes probar otra hoja del mismo libro desde el selector de hoja.</span>`);
   if (worstS && worstS.abs) sents.push(`La tienda con más desvío es <b>${esc(worstS.name)}</b> (${fmt(worstS.abs)} pares brutos, Δ neto ${sgn(worstS.b - worstS.a)}).` + (mcs[0] ? ` El modelo-color con más desvío es <b>${esc(mcs[0].id)}</b> (${fmt(mcs[0].abs)}).` : ''));
   const ts = (SRC.rmh && SRC.rpl) ? stampGap(SRC.rmh.stamp, SRC.rpl.stamp) : '';
@@ -678,8 +685,12 @@ function viewRes() {
   }).join('') || '<div class="empty">Sin diferencias.</div>';
   const top = mcs.slice(0, 10).map((g) => `<button class="mcrow" type="button" data-go-mc="${esc(g.id)}"><span><span class="c">${esc(g.id)}</span><span class="ds">${esc(g.desc)}</span></span><span class="v ${g.b - g.a > 0 ? 'over' : g.b - g.a < 0 ? 'under' : ''}">${sgn(g.b - g.a)}</span><span class="v muted">${fmt(g.abs)} bruto</span></button>`).join('') || '<div class="empty">Sin diferencias.</div>';
 
-  const brs = [...V.byB.values()].sort((x, y) => y.abs - x.abs || y.a - x.a);
-  const brandCard = brs.length > 1 ? `<section class="card"><h2>Por marca</h2><div class="tw"><table><thead><tr><th>Marca</th><th class="n">RMH</th><th class="n">RPL</th><th class="n">Δ neto</th><th class="n">Δ %</th><th class="n">Desvío bruto</th><th class="n">SKU que coinciden</th></tr></thead><tbody>${brs.map((g) => `<tr class="click" data-go-brand="${esc(g.id)}"><td>${esc(g.name)}</td><td class="n">${fmt(g.a)}</td><td class="n">${fmt(g.b)}</td><td class="n ${g.b - g.a > 0 ? 'over' : g.b - g.a < 0 ? 'under' : ''}">${sgn(g.b - g.a)}</td><td class="n">${pcell(g)}</td><td class="n">${fmt(g.abs)}</td><td class="n">${pct(1 - g.nd / g.n)}</td></tr>`).join('')}</tbody></table></div></section>` : '';
+  const groupCard = (title, label, map, attr) => {
+    const gs = [...map.values()].sort((x, y) => y.abs - x.abs || y.a - x.a);
+    if (gs.length < 2) return '';
+    return `<section class="card"><h2>${title}</h2><div class="tw"><table><thead><tr><th>${label}</th><th class="n">RMH</th><th class="n">RPL</th><th class="n">Δ neto</th><th class="n">Δ %</th><th class="n">Desvío bruto</th><th class="n">SKU que coinciden</th></tr></thead><tbody>${gs.map((g) => `<tr class="click" data-${attr}="${esc(g.id)}"><td>${esc(g.name)}</td><td class="n">${fmt(g.a)}</td><td class="n">${fmt(g.b)}</td><td class="n ${g.b - g.a > 0 ? 'over' : g.b - g.a < 0 ? 'under' : ''}">${sgn(g.b - g.a)}</td><td class="n">${pcell(g)}</td><td class="n">${fmt(g.abs)}</td><td class="n">${pct(1 - g.nd / g.n)}</td></tr>`).join('')}</tbody></table></div></section>`;
+  };
+  const brandCard = groupCard('Por marca', 'Marca', V.byB, 'go-brand') + groupCard('Por línea', 'Línea', V.byL, 'go-line');
   return `<div class="card read">${sents.map((s) => `<p>${s}</p>`).join('')}</div>
   <div class="kpis">
     <div class="kpi"><div class="l">RMH</div><div class="v">${fmt(T.a)}</div><div class="d">pares en tienda · ${SRC.rmh && SRC.rmh.single ? 'Suma de stock' : S.opt.rm === 'total' ? 'stock + fl' : 'solo stock'}</div></div>
@@ -752,12 +763,13 @@ function setDefaults() {
 
 /* ---------- eventos ---------- */
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('button, tr[data-go-store], tr[data-go-mc], tr[data-go-brand], tr[data-open]'); if (!t) return;
+  const t = e.target.closest('button, tr[data-go-store], tr[data-go-mc], tr[data-go-brand], tr[data-go-line], tr[data-open]'); if (!t) return;
   const o = S.opt, d = t.dataset;
   if (d.tab) { S.tab = d.tab; render(); return; }
   if (t.closest('#seg-rm')) { o.rm = d.v; return refresh(); }
   if (t.closest('#seg-pm')) { o.pm = d.v; return refresh(); }
   if (d.all) { (d.all === 'brand' ? o.brands : o.lines).clear(); return refresh(); }
+  if (d.goLine !== undefined) { o.lines = new Set([d.goLine]); syncControls(); S.tab = 'tda'; return render(); }
   if (d.goBrand !== undefined) { o.brands = new Set([d.goBrand]); syncControls(); S.tab = 'tda'; return render(); }
   if (d.brand !== undefined) { o.brands.has(d.brand) ? o.brands.delete(d.brand) : o.brands.add(d.brand); return refresh(); }
   if (d.line !== undefined) { o.lines.has(d.line) ? o.lines.delete(d.line) : o.lines.add(d.line); return refresh(); }
@@ -765,7 +777,7 @@ document.addEventListener('click', (e) => {
   if (d.goMc !== undefined) { o.mc = d.goMc; S.tab = 'sm'; return render(); }
   if (d.open !== undefined) { S.open.has(d.open) ? S.open.delete(d.open) : S.open.add(d.open); return render(); }
   if (d.clear === 'mc') { o.mc = ''; return render(); }
-  if (d.sort) { const [tab, k] = d.sort.split(':'), s = S.sort[tab]; if (s.k === k) s.dir = -s.dir; else { s.k = k; s.dir = (k === 'name' || k === 'id' || k === 'e' || k === 'es') ? 1 : -1; } return render(); }
+  if (d.sort) { const [tab, k] = d.sort.split(':'), s = S.sort[tab]; if (s.k === k) s.dir = -s.dir; else { s.k = k; s.dir = (k === 'name' || k === 'id' || k === 'e' || k === 'es' || k === 'line') ? 1 : -1; } return render(); }
   if (d.more) { S.limit[d.more] += 150; return render(); }
   if (d.copy) return copyTable(d.copy);
 });
@@ -773,6 +785,7 @@ const refresh = () => { syncControls(); render(); };
 $('#sel-store').addEventListener('change', (e) => { S.opt.store = e.target.value; render(); });
 $('#q').addEventListener('input', (e) => { S.opt.q = e.target.value; render(); });
 $('#ck-diff').addEventListener('change', (e) => { S.opt.onlyDiff = e.target.checked; render(); });
+$('#ck-exa').addEventListener('change', (e) => { S.opt.exOnlyA = e.target.checked; render(); });
 $('#min').addEventListener('input', (e) => { S.opt.minAbs = Math.max(0, parseInt(e.target.value, 10) || 0); render(); });
 $('#ck-incl').addEventListener('change', (e) => { S.opt.incl = e.target.checked; refresh(); });
 
@@ -782,8 +795,8 @@ function copyTable(tab) {
   else {
     const map = { tda: V.byS, mc: V.byM, sm: V.bySM }[tab];
     const rows = pickRows(map, tab, COLS[tab]);
-    head = { tda: ['Id', 'Tienda', 'RMH', 'RPL', 'Δ neto', 'Desvío bruto', 'SKU con dif.', 'SKU'], mc: ['Modelo-color', 'Descripción', 'RMH', 'RPL', 'Δ neto', 'Desvío bruto', 'SKU con dif.', 'SKU'], sm: ['Id tienda', 'Tienda', 'Modelo-color', 'RMH', 'RPL', 'Δ neto', 'Desvío bruto', 'SKU con dif.', 'SKU'] }[tab];
-    lines = rows.map((g) => (tab === 'tda' ? [g.id, g.name] : tab === 'mc' ? [g.id, g.desc] : [g.s, g.name, g.e]).concat([g.a, g.b, g.b - g.a, g.abs, g.nd, g.n]));
+    head = { tda: ['Id', 'Tienda', 'RMH', 'RPL', 'Δ neto', 'Desvío bruto', 'SKU con dif.', 'SKU'], mc: ['Modelo-color', 'Descripción', 'Línea', 'RMH', 'RPL', 'Δ neto', 'Desvío bruto', 'SKU con dif.', 'SKU'], sm: ['Id tienda', 'Tienda', 'Modelo-color', 'Línea', 'RMH', 'RPL', 'Δ neto', 'Desvío bruto', 'SKU con dif.', 'SKU'] }[tab];
+    lines = rows.map((g) => (tab === 'tda' ? [g.id, g.name] : tab === 'mc' ? [g.id, g.desc, g.line] : [g.s, g.name, g.e, g.line]).concat([g.a, g.b, g.b - g.a, g.abs, g.nd, g.n]));
   }
   const txt = [head, ...lines].map((r) => r.join('\t')).join('\n');
   const done = () => { const b = document.querySelector(`[data-copy="${tab}"]`); if (b) { b.textContent = 'Copiado'; setTimeout(() => { b.textContent = 'Copiar tabla'; }, 1500); } };
