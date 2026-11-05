@@ -27,6 +27,7 @@ Hasta que cargues los dos archivos, la página muestra datos de ejemplo marcados
 - Las tiendas que están en un solo archivo quedan fuera del cruce, para no contarlas como diferencia. Se ven en la pestaña Cobertura.
 - Solo entran estas marcas: Caterpillar, Converse, Fila, Hi-Tec, Merrell, Umbro, New Balance, Steve Madden, Madden Girl y Madden. La lista está en la constante `BRANDS_OK` de `index.html`. Todas las líneas entran; sin selección se comparan todas.
 - Los nombres de tienda salen del RPL, porque la hoja `stockrcp` no los trae.
+- El botón «Ver tiendas que faltan» lista las tiendas que están en un solo archivo, con sus pares.
 - «Excluir solo RMH» quita los SKU que RMH tiene en una tienda y el RPL no ve, y recalcula todos los totales.
 
 ## Pestañas
