@@ -7,7 +7,7 @@ Los archivos se leen en el navegador. No se suben a ningún servidor ni se guard
 ## Cómo se usa
 
 1. Abre `index.html` en el navegador (o la página publicada, si este repositorio tiene GitHub Pages activo).
-2. Arrastra el Stock Diario (`.xlsx`, hoja `Stock`) en la tarjeta RMH.
+2. Arrastra el libro del RMH (`.xlsx`, hoja `stockrcp`) en la tarjeta RMH.
 3. Arrastra el RPL (`.csv`, separado por `;`) en la tarjeta RPL.
 4. Lee el Resumen y baja al detalle con las pestañas.
 
@@ -17,15 +17,16 @@ Hasta que cargues los dos archivos, la página muestra datos de ejemplo marcados
 
 | | RMH | RPL |
 |---|---|---|
-| Hoja o archivo | hoja `Stock` (o `.csv` con las mismas columnas) | `Rpl_KSD_….csv` |
-| Tienda | `storeid` | `IDSTORE` |
-| SKU | `codigoGp` | `ITEMCODE` |
-| Cantidad | `total` (stock + fl), o solo `stock` | `STK_TDA` (en tienda), o `STK_TOT` (con tránsito) |
+| Hoja o archivo | hoja `stockrcp` (si no existe, `Stock` o `Consulta`; también sirve un `.csv` con las mismas columnas) | `Rpl_KSD_….csv` |
+| Tienda | `Storeid` | `IDSTORE` |
+| SKU | `CodigoGp` | `ITEMCODE` |
+| Cantidad | columna `Stock` (en la hoja `Stock` antigua hay también `total`, stock + fl) | `STK_TDA` (en tienda), o `STK_TOT` (con tránsito) |
 
 - **Δ = RPL − RMH.** Positivo significa que el RPL tiene de más.
 - **Desvío bruto** es la suma de |Δ| por SKU. Muestra las diferencias que el neto compensa entre sí.
 - Las tiendas que están en un solo archivo quedan fuera del cruce, para no contarlas como diferencia. Se ven en la pestaña Cobertura.
-- Funciona para todas las marcas y líneas. Sin selección se comparan todas.
+- Solo entran estas marcas: Caterpillar, Converse, Fila, Hi-Tec, Merrell, Umbro, New Balance, Steve Madden, Madden Girl y Madden. La lista está en la constante `BRANDS_OK` de `index.html`. Todas las líneas entran; sin selección se comparan todas.
+- Los nombres de tienda salen del RPL, porque la hoja `stockrcp` no los trae.
 - «Excluir solo RMH» quita los SKU que RMH tiene en una tienda y el RPL no ve, y recalcula todos los totales.
 
 ## Pestañas

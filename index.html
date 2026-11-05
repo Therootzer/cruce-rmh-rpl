@@ -163,7 +163,7 @@ tr.sub td { background: var(--surface-2); padding: 8px 16px; }
       <input type="file" id="file-rmh" accept=".xlsx,.xlsm,.csv" aria-label="Cargar RMH (Stock Diario)">
       <span class="tag">RMH · Stock Diario</span>
       <span class="ttl">Arrastra el .xlsx o haz clic</span>
-      <span class="st" id="st-rmh">Se usa la hoja Stock. Si prefieres otra hoja (por ejemplo Consulta), la eliges después de cargar. También sirve un .csv de una hoja con esas columnas.</span>
+      <span class="st" id="st-rmh">Se usa la hoja stockrcp (columna Stock). Si prefieres otra hoja, la eliges después de cargar. También sirve un .csv de una hoja con esas columnas.</span>
       <div class="prog" id="pg-rmh" hidden><i></i></div>
     </div>
     <div class="drop" id="drop-rpl">
@@ -287,7 +287,7 @@ const Parse = (() => {
   }
 
   /* ---------- RMH ---------- */
-  const RMH_COLS = { storeid: 's', local: 'sn', codigogp: 'k', codcolor: 'e', 'modelo-color': 'e2', descripcion: 'd', stock: 'stock', fl: 'fl', total: 'total', 'suma de stock': 'stock', 'suma de fl': 'fl', 'suma de total': 'total', talla: 't', marca_f: 'm2', marca: 'm1', linea_f: 'l2', linea: 'l1', fechahora: 'ts' };
+  const RMH_COLS = { storeid: 's', local: 'sn', codigogp: 'k', codcolor: 'e', 'modelo-color': 'e2', descripcion: 'd', stock: 'stock', fl: 'fl', total: 'total', 'suma de stock': 'stock', 'suma de fl': 'fl', 'suma de total': 'total', talla: 't', marca_f: 'm2', marca: 'm1', linea_f: 'l2', linea: 'l1', fechahora: 'ts', fecha: 'ts' };
 
   function finishRmh(o) {
     const l2 = nz(o.l2); const l = (l2 && l2 !== '-') ? l2 : nz(o.l1);
@@ -341,9 +341,9 @@ const Parse = (() => {
       sheets.push({ name: entity(attrs(m[0], 'name')), path: t.startsWith('/') ? t.slice(1) : 'xl/' + t });
     }
     const byName = (n) => sheets.find((s) => s.name.toLowerCase() === n);
-    let sheet = sheets.find((s) => s.name === wantedSheet) || byName('stock') || byName('consulta');
-    if (!sheet) { const e = new Error('No encontré la hoja Stock ni la hoja Consulta en este libro.'); e.sheets = sheets.map((s) => s.name); throw e; }
-    const dictSheet = byName('stock') && byName('stock').name !== sheet.name ? byName('stock') : null;
+    let sheet = sheets.find((s) => s.name === wantedSheet) || byName('stockrcp') || byName('stock') || byName('consulta');
+    if (!sheet) { const e = new Error('No encontré la hoja stockrcp, Stock ni Consulta en este libro.'); e.sheets = sheets.map((s) => s.name); throw e; }
+    const dictSheet = byName('stock') && byName('stock').name !== sheet.name && sheet.name.toLowerCase() !== 'stockrcp' ? byName('stock') : null;
     onProgress && onProgress(0.15, 'Descomprimiendo la hoja ' + sheet.name);
     await tick();
     const parts = fflate.unzipSync(buf, { filter: (f) => f.name === sheet.path || f.name === 'xl/sharedStrings.xml' || (dictSheet && f.name === dictSheet.path) });
@@ -413,15 +413,13 @@ const Parse = (() => {
       if (!f2) dict = null;
     }
     let sinClas = 0;
-    if (!classified) {
-      stamp = '';
-      for (const r of merged.rows) {
-        const d = dict && dict.get(r.k);
-        if (d) { r.e = r.e || d.e; r.d = r.d || d.d; r.t = r.t || d.t; r.m = r.m || d.m; r.l = r.l || d.l; }
-        if (!r.e) r.e = r.k.replace(/-[^-]*$/, '');
-        if (!r.t) r.t = r.k.slice(r.k.lastIndexOf('-') + 1);
-        if (!r.m) sinClas++;
-      }
+    if (!classified) stamp = '';
+    for (const r of merged.rows) {
+      const d = dict && dict.get(r.k);
+      if (d) { r.e = r.e || d.e; r.d = r.d || d.d; r.t = r.t || d.t; r.m = r.m || d.m; r.l = r.l || d.l; }
+      if (!r.e) r.e = r.k.replace(/-[^-]*$/, '');
+      if (!r.t) r.t = r.k.slice(r.k.lastIndexOf('-') + 1);
+      if (!r.m) sinClas++;
     }
     return { sheets: sheets.map((s) => s.name), sheet: sheet.name, rows: merged.rows, stamp, single: !fields.has('total') && !fields.has('fl'), dictFrom: dict ? dictSheet.name : '', sinClas };
   }
@@ -457,7 +455,9 @@ let V = null;       // vista calculada
 let rmhFile = null;
 
 /* ---------- marcas ---------- */
-const BALIAS = { STEVEMADDE: 'STEVEMADDEN', MADDEN: 'STEVEMADDEN' };
+const BALIAS = { STEVEMADDE: 'STEVEMADDEN' };
+/* Marcas que entran al cruce (CAT, Converse, Fila, Hi-Tec, Merrell, Umbro, New Balance, Steve Madden, Madden Girl, Madden). */
+const BRANDS_OK = new Set(['CATERPILLAR', 'CONVERSE', 'FILA', 'HITEC', 'MERRELL', 'UMBRO', 'NEWBALANCE', 'STEVEMADDEN', 'MADDENGIRL', 'MADDEN']);
 const BLABEL = { STEVEMADDEN: 'STEVE MADDEN', HITEC: 'HI-TEC', MADDENGIRL: 'MADDEN GIRL', NEWBALANCE: 'NEW BALANCE', DOLCEVITA: 'DOLCE VITA' };
 const bkey = (m) => { const u = String(m || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return BALIAS[u] || u; };
 
@@ -477,8 +477,9 @@ function rebuild(rmhRows, rplRows) {
     if (it.m && !brands.has(it.m)) brands.set(it.m, BLABEL[it.m] || String(r.m).toUpperCase());
     return it;
   };
-  for (const r of rplRows) { store(r.s, r.sn).inP = true; item(r).rpl = { tda: r.tda, tot: r.tot }; }
-  for (const r of rmhRows) { store(r.s, r.sn).inR = true; item(r).rmh = { total: r.total, stock: r.stock }; }
+  // La presencia de la tienda cuenta con todas las marcas del archivo; los SKU solo con las marcas permitidas.
+  for (const r of rplRows) { store(r.s, r.sn).inP = true; if (BRANDS_OK.has(bkey(r.m))) item(r).rpl = { tda: r.tda, tot: r.tot }; }
+  for (const r of rmhRows) { store(r.s, r.sn).inR = true; if (BRANDS_OK.has(bkey(r.m))) item(r).rmh = { total: r.total, stock: r.stock }; }
   for (const it of items.values()) {
     if (!it.m) { it.m = 'SINCLAS'; brands.set('SINCLAS', 'SIN CLASIFICAR'); }
     if (!it.l) it.l = 'SIN CLASIFICAR';
@@ -693,7 +694,7 @@ function viewRes() {
   const brandCard = groupCard('Por marca', 'Marca', V.byB, 'go-brand') + groupCard('Por línea', 'Línea', V.byL, 'go-line');
   return `<div class="card read">${sents.map((s) => `<p>${s}</p>`).join('')}</div>
   <div class="kpis">
-    <div class="kpi"><div class="l">RMH</div><div class="v">${fmt(T.a)}</div><div class="d">pares en tienda · ${SRC.rmh && SRC.rmh.single ? 'Suma de stock' : S.opt.rm === 'total' ? 'stock + fl' : 'solo stock'}</div></div>
+    <div class="kpi"><div class="l">RMH</div><div class="v">${fmt(T.a)}</div><div class="d">pares en tienda · ${SRC.rmh && SRC.rmh.single ? 'columna Stock' : S.opt.rm === 'total' ? 'stock + fl' : 'solo stock'}</div></div>
     <div class="kpi"><div class="l">RPL</div><div class="v">${fmt(T.b)}</div><div class="d">pares · ${S.opt.pm === 'tda' ? 'STK_TDA' : 'STK_TDA + tránsito'}</div></div>
     <div class="kpi"><div class="l">Δ neto (RPL − RMH)</div><div class="v ${dl > 0 ? 'over' : dl < 0 ? 'under' : ''}">${sgn(dl)}</div><div class="d">${T.a > 0 ? (p > 0 ? '+' : p < 0 ? '−' : '') + pct(Math.abs(p)) + ' sobre RMH' : '—'}</div></div>
     <div class="kpi"><div class="l">Desvío bruto</div><div class="v">${fmt(T.abs)}</div><div class="d">suma de |Δ| por SKU · ${T.a > 0 ? pct(T.abs / T.a) + ' de RMH' : '—'}</div></div>
